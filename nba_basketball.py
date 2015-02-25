@@ -193,7 +193,7 @@ class Team(object):
         print 'The %s won %s percent  of the time' % (winteam.name, str(wp))
 class League(object):
         def __init__(self):
-            f = open("C:\\Users\\Owner\\Documents\\GitHub\\Basketball\\nba_data.txt","r")
+            f = open("nba_data.txt","r")
             s = f.read()
             f.close()
             s = s.split(',')
