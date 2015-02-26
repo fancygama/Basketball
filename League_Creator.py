@@ -1,3 +1,4 @@
+from __future__ import division
 # -*- coding: cp1252 -*-
 import random
 class Team(object):
@@ -61,8 +62,10 @@ class Team(object):
         print '%s: %s-%s, %s' % (self.name,self.w,self.l,"%0.3f" % self.get_wp())
     def get_gp(self):
         return self.w+self.l
+    def get_pyth(self):
+        return self.o ** self.pyth / (self.o ** self.pyth + self.d ** self.pyth)
 class CollegeTeam(Team):
-    def __init__(self,name,o,d,p):
+    def __init__(self,name,o,d,p,luck):
         self.name = name
         self.o = o
         self.d = d
@@ -72,6 +75,29 @@ class CollegeTeam(Team):
         self.pf = 0
         self.pa = 0
         self.pyth = 10.25
+        self.luck = luck
+    def proj_result(self,other,pr):
+        pf = self.o * other.d * .5 * (self.p + other.p) * .0001
+        pa = self.d * other.o * .5 * (self.p + other.p) * .0001
+        luck = .5 * (self.luck - other.luck)
+        pf += (luck/130)
+        pa -= (luck/130)
+        chance = pf ** self.pyth / (pf ** self.pyth + pa ** self.pyth)
+        if pr:
+            print 'The projected score is %s %s, %s %s' % (self.name,int(round(pf,0)),other.name, int(round(pa,0)))
+            print 'The odds of the %s winning are %s percent.' % (self.name,round(100*chance,1))
+        rand = .01*random.randint(0,100)
+        if chance > rand:
+            if pr:
+                print self.get_name() + ' win'
+            self.add_w()
+            other.add_l()
+        else:
+            if pr:
+                print other.get_name() + ' win'
+            self.add_l()
+            other.add_w()
+        return chance
 class League(object):
     def __init__(self,name,size,version):
         self.name = name
@@ -95,7 +121,7 @@ class League(object):
                 o = 90+.1*random.randint(0,200)
                 d = 90+.1*random.randint(0,200)
                 p = 60+.1*random.randint(0,50)
-                l.append(CollegeTeam(n,o,d,p))
+                l.append(CollegeTeam(n,o,d,p,0))
                 i += 1
                 self.l = l
         elif version == 1:
@@ -115,7 +141,7 @@ class League(object):
             f = open("college_data.txt","r")
             s = f.read()
             f.close()
-            s = s.split('-')
+            s = s.split('@')
             l = []
             for i in range(size):
                 tm = random.choice(s)
@@ -125,7 +151,7 @@ class League(object):
                 name = str(tm[0])
                 ind = int(name.find('¿'))
                 name = name[ind+1:]
-                l.append(CollegeTeam(name,float(tm[1]),float(tm[2]),float(tm[3])))
+                l.append(CollegeTeam(name,float(tm[1]),float(tm[2]),float(tm[3]),float(tm[4])))
                 i += 1
             self.l = l
     def print_out(self):
@@ -156,6 +182,12 @@ class League(object):
         print self.name + ' Standings:'
         self.sort_league()
         for each in self.l:
+            if each.name[0] == '#':
+                each.name = each.name[3:]
+                if each.name[0] == ' ':
+                    each.name = each.name[1:]
+            if self.l.index(each) < (25/351)*len(self.l):
+                each.name = '#' + str(self.l.index(each)+1) + ' ' + each.name
             each.print_standing()
     def get_list(self):
         return self.l
@@ -169,47 +201,27 @@ def play_league(l,reset,num):
     if reset:
         for each in l.get_list():
             each.reset()
+    count = 0
+    r = int(num/len(l.get_list()))
     while l.get_gp() < num*len(l.get_list()):
         for each in l.get_list():
-            for team in l.get_list():
+            for team in l.get_list(): 
                 if each.get_gp() == num:
                     break
                 if each.get_name() != team.get_name() and team.get_gp() < num:
                     each.proj_result(team,False)
+        count += 1
+        if count > r:
+            break
+    if l.get_gp() < num*len(l.get_list()):
+        for each in l.get_list():
+            each.set_w(int(num*each.get_pyth()+.5))
+            each.set_l(num-each.get_w())
+              
     print ' '
     l.print_standings()
     print ' '
-## below method has been replaced by simulate_season()
-##
-##def create_league():
-##    print 'Welcome to the League Creator!'
-##    print ''
-##    n = str(raw_input('Enter a name for your league: '))
-##    num = int(raw_input('Enter the amount of teams in ' + n + ' (from 2 to 100): '))
-##    while not(num >= 2 and num <=100):
-##        num = int(raw_input('Enter the amount of teams in ' + n + ' (from 2 to 100): '))
-##    l = League(n,num,True)
-##    print ''
-##    print 'Congratulations on creating the %s!' % (l.get_name())
-##    print ''
-##    l.print_out()
-##    print ''
-##    state = 'r'
-##    while state != 'end': 
-##        state = str(raw_input('Enter in "r" to play a random %s game, "s" to show the standings, "p" to play a full season (and reset the standings beforehand), or "end" to end the program: ' % (l.get_name())))
-##        if state == 'end':
-##            print
-##            print 'Thank you for using the Random League Creator'
-##            break
-##        print ''
-##        if state == 'r':
-##            l.play_random()
-##            print ''
-##        elif state == 's':
-##            l.print_standings()
-##            print ' '
-##        elif state == 'p':
-##            play_league(l,True,len(l.get_list()))
+    
 def simulate_season():
     print 'Welcome to the Season Simulator'
     print ''
@@ -230,8 +242,8 @@ def simulate_season():
                     print 'Thank you for using the Season Simulator'
                     return
                 play_league(l,True,state)
-        while not(ch >= 2 and ch <= 30 and ch % 2 == 0):
-            ch = int(raw_input('Enter even no. of random NCAA teams to use (from 2 to 30): '))
+        while not(ch >= 2 and ch <= 351):
+            ch = int(raw_input('Enter a no. of random NCAA teams to use (from 2 to 351): '))
         l = League('NCAA',ch,2)
         print ' '
         l.print_out()
